@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traductor · Qwen2-0.5B</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      color: #1a1a2e;
+    }
+
+    /* ── Card principal ── */
+    .card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+      padding: 2rem 2rem 1.5rem;
+      width: 100%;
+      max-width: 780px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 1.75rem;
+    }
+    .header-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6c63ff, #48cae4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .header p {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 2px;
+    }
+    .badge {
+      margin-left: auto;
+      background: #eef2ff;
+      color: #6c63ff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #d4ccff;
+    }
+
+    /* ── Selector de idiomas ── */
+    .lang-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+    .lang-bar select {
+      flex: 1;
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1.5px solid #e0e0e0;
+      background: #fafafa;
+      font-size: 0.9rem;
+      color: #1a1a2e;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+    .lang-bar select:focus { outline: none; border-color: #6c63ff; }
+
+    .swap-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1.5px solid #e0e0e0;
+      background: #fafafa;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .swap-btn:hover { background: #eef2ff; border-color: #6c63ff; }
+
+    /* ── Paneles de texto ── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 1.1rem;
+    }
+    @media (max-width: 540px) { .panels { grid-template-columns: 1fr; } }
+
+    .panel {
+      border-radius: 12px;
+      border: 1.5px solid #e8e8e8;
+      background: #fafafa;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .panel:focus-within { border-color: #6c63ff; }
+
+    .panel-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #aaa;
+      padding: 8px 12px 5px;
+      border-bottom: 1px solid #ebebeb;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      border: none;
+      resize: none;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: #1a1a2e;
+      background: transparent;
+      padding: 10px 12px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .output-box {
+      min-height: 140px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: #1a1a2e;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .output-box.placeholder { color: #bbb; font-style: italic; }
+    .output-box.loading { display: flex; align-items: center; gap: 8px; color: #888; }
+
+    /* Spinner */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid #e0d9ff;
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Botones de acción ── */
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .btn-primary {
+      height: 40px;
+      padding: 0 22px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #6c63ff, #48cae4);
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-secondary {
+      height: 40px;
+      padding: 0 16px;
+      border-radius: 10px;
+      border: 1.5px solid #e0e0e0;
+      background: #fafafa;
+      color: #666;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-secondary:hover { background: #f0f0f0; }
+
+    /* ── Ejemplos rápidos ── */
+    .examples-section { margin-bottom: 0.5rem; }
+    .examples-label {
+      font-size: 0.75rem;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+    .chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1.5px solid #e0e0e0;
+      background: #f5f5f5;
+      color: #555;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+    .chip:hover { border-color: #6c63ff; color: #6c63ff; background: #eef2ff; }
+
+    /* ── Mensajes de estado ── */
+    .error-msg {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #fff0f0;
+      border: 1px solid #ffcdd2;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: #c62828;
+      display: none;
+    }
+    .meta-info {
+      font-size: 0.72rem;
+      color: #bbb;
+      text-align: right;
+      margin-top: 8px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #f0f0f0;
+      font-size: 0.72rem;
+      color: #bbb;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">🌐</div>
+    <div>
+      <h1>Traductor de Idiomas</h1>
+      <p>Impulsado por Qwen2-0.5B · Hugging Face Inference</p>
+    </div>
+    <span class="badge">Qwen2-0.5B</span>
+  </div>
+
+  <!-- Selector de idiomas -->
+  <div class="lang-bar">
+    <select id="srcLang" aria-label="Idioma de origen">
+      <option value="English">🇺🇸 English</option>
+      <option value="Spanish">🇲🇽 Español</option>
+      <option value="French">🇫🇷 Français</option>
+      <option value="German">🇩🇪 Deutsch</option>
+      <option value="Portuguese">🇧🇷 Português</option>
+      <option value="Italian">🇮🇹 Italiano</option>
+      <option value="Japanese">🇯🇵 日本語</option>
+      <option value="Chinese">🇨🇳 中文</option>
+    </select>
+
+    <button class="swap-btn" id="swapBtn" title="Intercambiar idiomas" aria-label="Intercambiar idiomas">⇄</button>
+
+    <select id="tgtLang" aria-label="Idioma de destino">
+      <option value="Spanish">🇲🇽 Español</option>
+      <option value="English">🇺🇸 English</option>
+      <option value="French">🇫🇷 Français</option>
+      <option value="German">🇩🇪 Deutsch</option>
+      <option value="Portuguese">🇧🇷 Português</option>
+      <option value="Italian">🇮🇹 Italiano</option>
+      <option value="Japanese">🇯🇵 日本語</option>
+      <option value="Chinese">🇨🇳 中文</option>
+    </select>
+  </div>
+
+  <!-- Paneles de traducción -->
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-label">Texto original</div>
+      <textarea
+        id="inputText"
+        placeholder="Escribe o pega el texto aquí…"
+        aria-label="Texto a traducir"
+      ></textarea>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Traducción</div>
+      <div
+        class="output-box placeholder"
+        id="outputText"
+        aria-live="polite"
+        aria-label="Texto traducido"
+      >
+        La traducción aparecerá aquí…
+      </div>
+    </div>
+  </div>
+
+  <!-- Botones -->
+  <div class="actions">
+    <button class="btn-primary" id="translateBtn">
+      ✦ Traducir
+    </button>
+    <button class="btn-secondary" id="clearBtn">
+      ✕ Limpiar
+    </button>
+  </div>
+
+  <!-- Ejemplos rápidos -->
+  <div class="examples-section">
+    <div class="examples-label">Ejemplos rápidos (Inglés → Español):</div>
+    <div class="chips">
+      <button class="chip" onclick="setExample('I like soccer')">I like soccer</button>
+      <button class="chip" onclick="setExample('How are you?')">How are you?</button>
+      <button class="chip" onclick="setExample('What time is it?')">What time is it?</button>
+      <button class="chip" onclick="setExample('Good morning, have a nice day!')">Good morning!</button>
+      <button class="chip" onclick="setExample('Where is the nearest hospital?')">Where is the hospital?</button>
+    </div>
+  </div>
+
+  <!-- Error y meta -->
+  <div class="error-msg" id="errorMsg" role="alert"></div>
+  <div class="meta-info" id="metaInfo"></div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Modelo: Qwen/Qwen2-0.5B-Instruct &nbsp;·&nbsp;
+    API: Hugging Face Inference &nbsp;·&nbsp;
+    Sin API key requerida &nbsp;·&nbsp;
+    Atajo: <kbd>Ctrl + Enter</kbd> para traducir
+  </div>
+
+</div>
+
+<script>
+  /*
+   * ──────────────────────────────────────────────────────────────
+   *  Traductor con Qwen2-0.5B (Hugging Face Inference API)
+   *  Endpoint: /v1/chat/completions (compatible con OpenAI)
+   *  No requiere API key para el plan gratuito de HF
+   * ──────────────────────────────────────────────────────────────
+   */
+
+  const HF_API = "https://api-inference.huggingface.co/models/Qwen/Qwen2-0.5B-Instruct/v1/chat/completions";
+
+  // ── Traducir ──────────────────────────────────────────────────
+  async function translate() {
+    const text = document.getElementById('inputText').value.trim();
+    if (!text) return;
+
+    const src  = document.getElementById('srcLang').value;
+    const tgt  = document.getElementById('tgtLang').value;
+    const out  = document.getElementById('outputText');
+    const btn  = document.getElementById('translateBtn');
+    const err  = document.getElementById('errorMsg');
+    const meta = document.getElementById('metaInfo');
+
+    // Limpiar estado previo
+    err.style.display = 'none';
+    meta.textContent  = '';
+
+    // Mostrar spinner de carga
+    out.className = 'output-box loading';
+    out.innerHTML = '<div class="spinner"></div> <span>Traduciendo…</span>';
+    btn.disabled  = true;
+
+    const t0 = Date.now();
+
+    try {
+      // Prompt de instrucción para el modelo
+      const prompt = `Translate the following text from ${src} to ${tgt}. Output ONLY the translation, no explanations, no extra text.\n\nText: ${text}\n\nTranslation:`;
+
+      const response = await fetch(HF_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "Qwen/Qwen2-0.5B-Instruct",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 256,
+          temperature: 0.3   // Baja temperatura = traducciones más precisas
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Error HTTP ${response.status}`);
+      }
+
+      const data        = await response.json();
+      const translation = data.choices?.[0]?.message?.content?.trim() || '';
+
+      if (!translation) throw new Error('El modelo devolvió una respuesta vacía.');
+
+      // Mostrar traducción
+      out.className   = 'output-box';
+      out.textContent = translation;
+
+      const elapsed   = ((Date.now() - t0) / 1000).toFixed(1);
+      meta.textContent = `Traducido en ${elapsed}s · Qwen2-0.5B-Instruct`;
+
+    } catch (error) {
+      out.className   = 'output-box placeholder';
+      out.textContent = 'La traducción aparecerá aquí…';
+      err.textContent = '⚠ ' + error.message;
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Cargar ejemplo ────────────────────────────────────────────
+  function setExample(text) {
+    document.getElementById('inputText').value = text;
+    document.getElementById('srcLang').value   = 'English';
+    document.getElementById('tgtLang').value   = 'Spanish';
+    // Limpiar salida anterior
+    const out = document.getElementById('outputText');
+    out.className   = 'output-box placeholder';
+    out.textContent = 'La traducción aparecerá aquí…';
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('metaInfo').textContent   = '';
+  }
+
+  // ── Limpiar todo ──────────────────────────────────────────────
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('inputText').value    = '';
+    const out = document.getElementById('outputText');
+    out.className   = 'output-box placeholder';
+    out.textContent = 'La traducción aparecerá aquí…';
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('metaInfo').textContent   = '';
+  });
+
+  // ── Intercambiar idiomas ──────────────────────────────────────
+  document.getElementById('swapBtn').addEventListener('click', () => {
+    const s = document.getElementById('srcLang');
+    const t = document.getElementById('tgtLang');
+    [s.value, t.value] = [t.value, s.value];
+  });
+
+  // ── Botón Traducir ────────────────────────────────────────────
+  document.getElementById('translateBtn').addEventListener('click', translate);
+
+  // ── Atajo de teclado: Ctrl + Enter ────────────────────────────
+  document.getElementById('inputText').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) translate();
+  });
+</script>
+
+</body>
+</html>
